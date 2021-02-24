@@ -7,9 +7,7 @@ require github.com/coreos/etcd v3.3.25+incompatible
 require github.com/coreos/go-semver v0.3.0 // indirect
 
 require (
-	github.com/coreos/bbolt v0.0.0-00010101000000-000000000000 // indirect
-	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
-	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/coreos/bbolt v1.3.5 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
