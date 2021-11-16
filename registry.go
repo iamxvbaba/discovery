@@ -35,7 +35,7 @@ func NewService(info *ServiceInfo, endpoints []string) (service *Service, err er
 	if err != nil {
 		return nil, err
 	}
-
+	Log.SetPrefix("[registry]")
 	service = &Service{
 		ServiceInfo: info,
 		client:      client,
@@ -47,27 +47,27 @@ func NewService(info *ServiceInfo, endpoints []string) (service *Service, err er
 func (service *Service) Start() {
 	ch, err := service.keepAlive()
 	if err != nil {
-		fmt.Errorf("%s service Start routine error:%v \n", service.getKey(), err)
+		Log.Printf("%s service Start routine error:%v \n", service.getKey(), err)
 		return
 	}
 	for {
 		select {
 		case <-service.stop:
-			fmt.Errorf("%s service stop \n", service.getKey())
+			Log.Printf("%s service stop \n", service.getKey())
 			return
 		case <-service.client.Ctx().Done():
-			fmt.Errorf("%s service done \n", service.getKey())
+			Log.Printf("%s service done \n", service.getKey())
 			return
-		case _, ok := <-ch:
+		case resp, ok := <-ch:
 			// 监听租约
 			if !ok {
-				fmt.Println("keep alive channel closed")
+				Log.Println("keep alive channel closed")
 				if err = service.revoke(); err != nil {
-					fmt.Errorf("%s service revoke error:%v \n", service.getKey(), err)
+					Log.Printf("%s service revoke error:%v \n", service.getKey(), err)
 				}
 				return
 			}
-			// log.Infof("Recv reply from service: %s, ttl:%d", service.getKey(), resp.TTL)
+			Log.Printf("Recv reply from service: %s, ttl:%d \n", service.getKey(), resp.TTL)
 		}
 	}
 }
@@ -83,7 +83,7 @@ func (service *Service) keepAlive() (<-chan *clientv3.LeaseKeepAliveResponse, er
 		val, _ = json.Marshal(info)
 	)
 	// 创建一个租约
-	resp, err := service.client.Grant(context.TODO(), 5)
+	resp, err := service.client.Grant(context.TODO(), 15)
 	if err != nil {
 		return nil, err
 	}

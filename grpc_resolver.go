@@ -65,7 +65,6 @@ func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts re
 
 	r.cc = cc
 
-	fmt.Println("============Resolver.Build============")
 	go r.watch(fmt.Sprintf(r.service))
 
 	return r, nil
@@ -84,7 +83,6 @@ func (r *Resolver) watch(prefix string) {
 		})
 	}
 
-	fmt.Println("prefix:", prefix)
 	// 首次获取所有的服务
 	resp, err := r.cli.Get(context.Background(), prefix, clientv3.WithPrefix())
 	if err != nil {
@@ -110,15 +108,15 @@ func (r *Resolver) watch(prefix string) {
 			case mvccpb.PUT:
 				var info ServiceInfo
 				if err := json.Unmarshal(ev.Kv.Value, &info); err != nil {
-					fmt.Errorf("ev.Kv.Value json.Unmarshal error:%v \n", err)
+					Log.Printf("ev.Kv.Value json.Unmarshal error:%v \n", err)
 				}
 				addrDict[key] = resolver.Address{Addr: info.Addr, ServerName: info.Name}
-				fmt.Printf("[增加服务] key:%v server_name:%v addr:%v \n", key, info.Name, info.Addr)
+				Log.Printf("[增加服务] key:%v server_name:%v addr:%v \n", key, info.Name, info.Addr)
 				// 通知外部
 				info.Delete = false
 				r.changeNotify(info)
 			case mvccpb.DELETE:
-				fmt.Printf("[移除服务] key:%v server_name:%v addr:%v \n", key,
+				Log.Printf("[移除服务] key:%v server_name:%v addr:%v \n", key,
 					addrDict[key].ServerName, addrDict[key].Addr)
 				// 通知外部
 				r.changeNotify(ServiceInfo{
