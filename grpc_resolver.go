@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
@@ -57,8 +58,10 @@ func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts re
 	var err error
 
 	r.cli, err = clientv3.New(clientv3.Config{
-		Endpoints: r.endpoints,
+		Endpoints:   r.endpoints,
+		DialTimeout: time.Second * 5,
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("grpclb: create clientv3 client failed: %v", err)
 	}
