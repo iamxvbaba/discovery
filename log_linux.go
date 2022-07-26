@@ -1,3 +1,4 @@
+//go:build !windows
 package discovery
 
 
@@ -17,10 +18,6 @@ func init() {
 		panic(err)
 	}
 	Log = lg.New(f, "[mw]", lg.Ldate|lg.Ltime|lg.Lshortfile)
-
-	if runtime.GOOS == "windows" {
-		return
-	}
 
 	// 把文件句柄保存到全局变量，避免被GC回收
 	stdErrFile = f

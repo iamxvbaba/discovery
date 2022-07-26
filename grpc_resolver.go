@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
+	"go.etcd.io/etcd/api/v3/mvccpb"
+	"go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -63,7 +63,7 @@ func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts re
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("grpclb: create clientv3 client failed: %v", err)
+		return nil, fmt.Errorf("grpclb: create client/v3 client failed: %v", err)
 	}
 
 	r.cc = cc

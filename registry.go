@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/client/v3"
 )
 
 // 服务信息
