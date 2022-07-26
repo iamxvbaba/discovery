@@ -121,5 +121,5 @@ func (service *Service) revoke() error {
 
 func (service *Service) getKey() string {
 	return fmt.Sprintf("%s%s",
-		fmt.Sprintf("/%s/%s/", service.ServiceInfo.Name, service.ServiceInfo.Version), service.ServiceInfo.Addr)
+		fmt.Sprintf("%s%s", service.ServiceInfo.Name, service.ServiceInfo.Version), service.ServiceInfo.Addr)
 }

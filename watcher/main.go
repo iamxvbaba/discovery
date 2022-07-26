@@ -16,7 +16,7 @@ func main() {
 	}
 }
 func watch(etcd []string) {
-	watcher := discovery.NewWatcher(etcd, fmt.Sprintf("/%s/%s/", "test", "test_version"))
+	watcher := discovery.NewWatcher(etcd, fmt.Sprintf("/%s/%s/", "mechat_logic", "1.0"))
 	if watcher == nil {
 		fmt.Println("watcher is nil")
 		return
@@ -26,5 +26,10 @@ func watch(etcd []string) {
 			fmt.Printf("服务发生变化:%v\n", srv)
 		}
 	}()
+
+}
+
+func NewResolver(etcd []string) {
+	resolver := discovery.NewResolver(etcd, fmt.Sprintf("/%s/%s/", "mechat_logic", "1.0"), nil)
 
 }

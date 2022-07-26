@@ -35,7 +35,7 @@ func NewResolver(endpoints []string, service string, notify chan ServiceInfo) re
 // Scheme return etcd schema
 func (r *Resolver) Scheme() string {
 	// 最好用这种，因为grpc resolver.Register(r)在注册时，会取scheme，如果一个系统有多个grpc发现，就会覆盖之前注册的
-	return schema + "_" + r.service
+	return schema + "-" + r.service
 }
 
 // ResolveNow
@@ -56,7 +56,6 @@ func (r *Resolver) changeNotify(srv ServiceInfo) {
 // 实现grpc.resolve.Builder接口的方法
 func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
 	var err error
-
 	r.cli, err = clientv3.New(clientv3.Config{
 		Endpoints:   r.endpoints,
 		DialTimeout: time.Second * 5,
@@ -79,13 +78,15 @@ func (r *Resolver) watch(prefix string) {
 		for _, v := range addrDict {
 			addrList = append(addrList, v)
 		}
-		r.cc.UpdateState(resolver.State{
+		err := r.cc.UpdateState(resolver.State{
 			Addresses:     addrList,
 			ServiceConfig: nil,
 			Attributes:    nil,
 		})
+		if err != nil {
+			Log.Println(err)
+		}
 	}
-
 	// 首次获取所有的服务
 	resp, err := r.cli.Get(context.Background(), prefix, clientv3.WithPrefix())
 	if err != nil {
