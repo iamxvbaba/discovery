@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/iamxvbaba/discovery"
 )
 
@@ -11,9 +12,7 @@ func main() {
 	)
 	watch(etcdAddr)
 	fmt.Println("启动")
-	select {
-
-	}
+	select {}
 }
 func watch(etcd []string) {
 	watcher := discovery.NewWatcher(etcd, fmt.Sprintf("/%s/%s/", "mechat_logic", "1.0"))
@@ -30,6 +29,6 @@ func watch(etcd []string) {
 }
 
 func NewResolver(etcd []string) {
-	resolver := discovery.NewResolver(etcd, fmt.Sprintf("/%s/%s/", "mechat_logic", "1.0"), nil)
+	// resolver := discovery.NewResolver(etcd, fmt.Sprintf("/%s/%s/", "mechat_logic", "1.0"), nil)
 
 }
