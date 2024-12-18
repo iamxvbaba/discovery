@@ -6,120 +6,143 @@ import (
 	"fmt"
 	"time"
 
-	"go.etcd.io/etcd/client/v3"
+	"github.com/google/uuid"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// 服务信息
+type EtcdConfig struct {
+	Endpoints []string `yaml:"endpoints" toml:"endpoints"`
+	Username  string   `yaml:"username" toml:"username"`
+	Password  string   `yaml:"password" toml:"password"`
+}
+
+type RegistryInfo struct {
+	Name         string `yaml:"name" toml:"name"`
+	Version      string `yaml:"version" toml:"version"`
+	Port         int    `yaml:"port" toml:"port"`
+	ExternalAddr string `yaml:"external_addr" toml:"external_addr"` // 对外暴露地址
+}
+
+// ServiceInfo 服务信息
 type ServiceInfo struct {
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	Addr    string `json:"addr"`
-	Version string `json:"version"`
-	Delete  bool   `json:"delete"` // true 表示移除服务
+	ID       int64          `json:"id" toml:"id"`
+	Type     int64          `json:"type" toml:"type"`
+	Name     string         `json:"name" toml:"name"`
+	UUID     string         `json:"uuid" toml:"uuid"`
+	Version  string         `json:"version" toml:"version"`
+	Internal string         `json:"internal" toml:"internal"`
+	External string         `json:"external" toml:"external"`
+	Ext      map[string]any `json:"ext" toml:"ext"` // 新增扩展信息
 }
 
 type Service struct {
 	ServiceInfo *ServiceInfo
-	stop        chan struct{}
 	leaseId     clientv3.LeaseID
 	client      *clientv3.Client
+	key         string
 }
 
-// NewService 创建一个注册服务
-func NewService(info *ServiceInfo, endpoints []string) (service *Service, err error) {
+// Register 注册服务
+func Register(ctx context.Context, eCfg EtcdConfig, info *ServiceInfo) {
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: time.Second * 10,
+		DialTimeout: time.Second * 3,
+		Endpoints:   eCfg.Endpoints,
+		Username:    eCfg.Username,
+		Password:    eCfg.Password,
 	})
-
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	Log.SetPrefix("[registry]")
-	service = &Service{
+	if len(info.UUID) == 0 {
+		info.UUID = uuid.NewString()
+	}
+	s := &Service{
 		ServiceInfo: info,
 		client:      client,
 	}
-	return
+	// 防止连完etcd程序已经停止了
+	select {
+	case <-ctx.Done():
+		Log.Printf("discovery stopped by %v\n", ctx.Err())
+		return
+	default:
+	}
+	go s.run(ctx)
 }
 
-// Start 注册服务启动
-func (service *Service) Start() {
+func (s *Service) run(ctx context.Context) {
+	preKey := BuildPrefixKey(s.ServiceInfo.Name, s.ServiceInfo.Version)
+	s.key = fmt.Sprintf("%s/%s", preKey, s.ServiceInfo.Internal)
+
 	retry := 0
 re:
 	recvs := 0
 	for { // 网络抖动导致服务不可用的重试
 		if retry > 0 {
-			Log.Printf("%s keepAlive retry %d times error \n", service.getKey(), retry)
+			Log.Printf("%s keepAlive retry %d times error\n", s.key, retry)
 		}
-		ch, err := service.keepAlive()
+		ch, err := s.keepAlive()
 		if err != nil {
-			Log.Printf("%s service Start routine error:%v \n", service.getKey(), err)
+			Log.Printf("%s s Start routine error:%v\n", s.key, err)
 			retry++
 			time.Sleep(time.Second)
 			goto re
 		}
 		for {
 			select {
-			case <-service.stop:
-				Log.Printf("%s service stop \n", service.getKey())
+			case <-ctx.Done():
+				Log.Printf("%s done\n", s.key)
+				_ = s.revoke()
 				return
-			case <-service.client.Ctx().Done():
-				Log.Printf("%s service done \n", service.getKey())
+			case <-s.client.Ctx().Done():
+				_ = s.revoke()
+				Log.Printf("%s done\n", s.key)
 				return
 			case resp, ok := <-ch:
 				// 监听租约
 				if !ok {
-					Log.Println("keep alive channel closed")
-					if err = service.revoke(); err != nil {
-						Log.Printf("%s service revoke error:%v \n", service.getKey(), err)
+					Log.Printf("keep alive channel closed\n")
+					if err = s.revoke(); err != nil {
+						Log.Printf("%s s revoke error:%v\n", s.key, err)
 					}
 					retry++
 					time.Sleep(time.Second)
 					goto re
 				}
 				recvs++
-				if recvs%5 == 0 {
-					Log.Printf("Recv reply from service: %s, ttl:%d \n", service.getKey(), resp.TTL)
+				if recvs%60 == 0 {
+					Log.Printf("Recv reply from s: %s, ttl:%d\n", s.key, resp.TTL)
 				}
 			}
 		}
 	}
 }
 
-func (service *Service) Stop() {
-	service.stop <- struct{}{}
-}
-
-func (service *Service) keepAlive() (<-chan *clientv3.LeaseKeepAliveResponse, error) {
-	var (
-		info   = &service.ServiceInfo
-		key    = service.getKey()
-		val, _ = json.Marshal(info)
-	)
+func (s *Service) keepAlive() (<-chan *clientv3.LeaseKeepAliveResponse, error) {
+	val, _ := json.Marshal(&s.ServiceInfo)
 	ctx, fn := context.WithTimeout(context.Background(), 5*time.Second)
 	defer fn()
 	// 创建一个租约
-	resp, err := service.client.Grant(ctx, 6)
+	resp, err := s.client.Grant(ctx, 6)
 	if err != nil {
 		return nil, err
 	}
-	_, err = service.client.Put(ctx, key, string(val), clientv3.WithLease(resp.ID))
+	_, err = s.client.Put(ctx, s.key, string(val), clientv3.WithLease(resp.ID))
 	if err != nil {
 		return nil, err
 	}
-	service.leaseId = resp.ID
-	return service.client.KeepAlive(context.Background(), resp.ID)
+	s.leaseId = resp.ID
+	return s.client.KeepAlive(context.Background(), resp.ID)
 }
 
-func (service *Service) revoke() error {
+func (s *Service) revoke() error {
 	ctx, fn := context.WithTimeout(context.Background(), 3*time.Second)
 	defer fn()
-	_, err := service.client.Revoke(ctx, service.leaseId)
+	_, err := s.client.Revoke(ctx, s.leaseId)
 	return err
 }
 
-func (service *Service) getKey() string {
-	return fmt.Sprintf("%s%s",
-		fmt.Sprintf("%s%s", service.ServiceInfo.Name, service.ServiceInfo.Version), service.ServiceInfo.Addr)
+func BuildPrefixKey(name, version string) string {
+	return fmt.Sprintf("/%s/%s", name, version)
 }
