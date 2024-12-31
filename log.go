@@ -13,7 +13,7 @@ var Log *lg.Logger
 var stdErrFile *os.File
 
 func init() {
-	f, err := os.OpenFile("discovery.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("std_out.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if nil != err {
 		panic(err)
 	}
