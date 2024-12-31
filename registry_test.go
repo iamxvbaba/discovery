@@ -25,7 +25,7 @@ func TestRegister(t *testing.T) {
 
 func TestEtcdQuery(t *testing.T) {
 	eCfg := EtcdConfig{
-		Endpoints: []string{"120.26.90.21:2379"},
+		Endpoints: []string{"127.0.0.1:2379"},
 		Username:  "root",
 		Password:  "qwer1234",
 	}
